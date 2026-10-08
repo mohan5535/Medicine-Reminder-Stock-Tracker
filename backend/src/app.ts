@@ -52,8 +52,22 @@ app.use(
 
 app.use(express.json());
 
+// Normalize consecutive slashes and route non-prefixed requests to /api
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  const [pathname, ...queryParts] = req.url.split("?");
+  const query = queryParts.length > 0 ? `?${queryParts.join("?")}` : "";
+  const normalizedPath = pathname.replace(/\/+/g, "/");
+
+  if (!normalizedPath.startsWith("/api") && normalizedPath !== "/") {
+    req.url = `/api${normalizedPath}${query}`;
+  } else {
+    req.url = `${normalizedPath}${query}`;
+  }
+  next();
+});
+
 // Health check
-app.get("/api/health", (_req, res) => {
+app.get(["/api/health", "/health", "/"], (_req, res) => {
   res.status(200).json({
     success: true,
     message: "Medicine Reminder API is running",
