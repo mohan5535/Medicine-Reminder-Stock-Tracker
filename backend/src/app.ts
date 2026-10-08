@@ -9,13 +9,18 @@ const app = express();
 const allowedOrigins: string[] = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "https://medicine-reminder-stock-tracker-fro.vercel.app",
 ];
 
 if (process.env.CLIENT_URL) {
   const envOrigins = process.env.CLIENT_URL.split(",").map((url) =>
     url.trim().replace(/\/$/, "")
   );
-  allowedOrigins.push(...envOrigins);
+  for (const originUrl of envOrigins) {
+    if (originUrl && !allowedOrigins.includes(originUrl)) {
+      allowedOrigins.push(originUrl);
+    }
+  }
 }
 
 app.use(
@@ -24,15 +29,14 @@ app.use(
       // Allow requests with no origin (e.g. mobile apps, curl, server-to-server)
       if (!origin) return callback(null, true);
 
-      const normalizedOrigin = origin.replace(/\/$/, "");
+      const normalizedOrigin = origin.trim().replace(/\/$/, "");
 
       const isAllowed =
         allowedOrigins.includes(normalizedOrigin) ||
-        (process.env.NODE_ENV !== "production" &&
-          (normalizedOrigin.startsWith("http://localhost:") ||
-            normalizedOrigin.startsWith("http://127.0.0.1:"))) ||
-        (/^https:\/\/.*\.vercel\.app$/.test(normalizedOrigin) &&
-          allowedOrigins.some((o) => o.includes("vercel.app")));
+        normalizedOrigin === "https://medicine-reminder-stock-tracker-fro.vercel.app" ||
+        normalizedOrigin.endsWith(".vercel.app") ||
+        normalizedOrigin.startsWith("http://localhost:") ||
+        normalizedOrigin.startsWith("http://127.0.0.1:");
 
       if (isAllowed) {
         callback(null, true);
