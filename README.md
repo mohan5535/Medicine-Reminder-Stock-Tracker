@@ -1,290 +1,442 @@
-# Medicine Reminder & Stock Tracker
+# Medicine-Reminder-Stock-Tracker
 
-A production-ready full-stack healthcare web application that manages prescription schedules, tracks daily medication adherence, and automates pharmacy inventory levels in real time.
+![TypeScript](https://img.shields.io/badge/TypeScript-Full%20Stack-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![React](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite%208-61DAFB?style=flat-square&logo=react&logoColor=black)
+![TailwindCSS](https://img.shields.io/badge/Styling-Tailwind%20CSS%204-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![Express](https://img.shields.io/badge/Backend-Express%205.1.0-000000?style=flat-square&logo=express&logoColor=white)
+![MongoDB](https://img.shields.io/badge/Database-MongoDB%20%2B%20Mongoose%208-47A248?style=flat-square&logo=mongodb&logoColor=white)
+![License](https://img.shields.io/badge/License-ISC%20(backend%2Fpackage.json)-blue?style=flat-square)
 
-Live Deployments (Placeholders):
-- **Frontend (Vercel)**: `https://your-frontend.vercel.app`
-- **Backend API (Render)**: `https://your-backend.onrender.com/api`
-
----
-
-## Features
-
-- **Dashboard Adherence Overview**: Real-time adherence metrics (Total Medicines, Today's Doses, Taken Today, Missed Today, Low Stock alerts, Out of Stock warnings).
-- **Today's Schedule & Actions**: Direct "Mark Taken" and "Mark Missed" intake tracking with instant stock updates.
-- **Medication Catalog**: Complete CRUD management for medications with dosages, frequencies, schedule timings, active durations, and custom notes.
-- **Automated Inventory & Stock Tracking**:
-  - Automatically deducts stock upon recording a dose as "Taken".
-  - Prevents double deduction for the same dose.
-  - Hard guards ensuring stock never drops below zero.
-  - Visual stock level indicators and threshold warnings (Normal, Low Stock, Out of Stock).
-  - One-click stock refill and adjustment tool.
-- **Prescription Schedules**: Configurable recurring schedules (daily, weekly, custom) with one-click enable/disable toggles.
-- **Audit & Compliance History**: Full historical log of all taken and missed doses with timestamps (`takenAt`), filters by medicine, and status tracking.
-- **Robust Error Handling**: Clean JSON error responses, form validation, delete confirmation modals, and retry states.
+> Full-stack TypeScript web application for managing medication schedules, tracking daily doses, monitoring low-stock thresholds, and automatically deducting inventory when doses are marked as taken.
 
 ---
 
-## Tech Stack
+## Table of Contents
 
-### Frontend
-- **Framework**: React 19, Vite, TypeScript
-- **Styling**: Tailwind CSS
-- **Routing**: React Router DOM (with SPA routing fallback for Vercel)
-- **Icons**: Lucide React
-- **Architecture**: Modular layout, Context-based Toast notification system, reusable UI components
-
-### Backend
-- **Runtime & Framework**: Node.js, Express 5, TypeScript
-- **Database & ODM**: MongoDB Atlas, Mongoose
-- **CORS**: Configured for local development and production Vercel origins
-- **Validation**: Schema-level and controller-level data validation
+- [Project Introduction](#project-introduction)
+- [Problem Statement](#problem-statement)
+- [Project Objectives](#project-objectives)
+- [Key Features](#key-features)
+- [Technology Stack](#technology-stack)
+- [Screenshots](#screenshots)
+- [Architecture Diagram](#architecture-diagram)
+- [Application Workflow](#application-workflow)
+- [Project Directory Structure](#project-directory-structure)
+- [Database Design](#database-design)
+- [API Documentation](#api-documentation)
+- [Installation Instructions](#installation-instructions)
+- [Environment Variables](#environment-variables)
+- [How to Run Locally](#how-to-run-locally)
+- [Usage Examples & Real-World Scenarios](#usage-examples--real-world-scenarios)
+- [Testing Instructions & Results](#testing-instructions--results)
+- [Deployment Instructions](#deployment-instructions)
+- [Security Considerations](#security-considerations)
+- [Future Improvements](#future-improvements)
+- [Contribution Guidelines](#contribution-guidelines)
+- [License](#license)
+- [Author](#author)
 
 ---
 
-## Architecture
+## Project Introduction
 
+**Medicine-Reminder-Stock-Tracker** combines a RESTful Express 5 + Mongoose backend with a responsive React 19 + Tailwind CSS 4 single-page application. Patients and caregivers can maintain a medicine inventory, define recurring dosage schedules, record daily adherence (`pending`, `taken`, `missed`), review adherence history, and receive automated inventory updates whenever a scheduled dose is confirmed taken.
+
+---
+
+## Problem Statement
+
+Managing multiple prescriptions manually introduces two recurring failure modes:
+
+1. **Missed or Duplicated Doses:** Without a centralized daily schedule and timestamped log (`takenAt`), patients lose track of whether a morning or evening dose was already administered.
+2. **Unexpected Stockouts:** Paper notes or standalone alarm apps do not decrement pill counts when doses are logged, leaving patients unaware that stock has fallen below their refill threshold until a bottle is empty.
+
+---
+
+## Project Objectives
+
+- Provide full CRUD management for medications (`Medicine`), dosage schedules (`Schedule`), and daily dose records (`DoseRecord`) persisted in MongoDB.
+- Enforce idempotent stock deduction inside the API controller so marking a dose `taken` decrements `currentStock` once (floored at `0`) and timestamps `takenAt`.
+- Support timezone-tolerant `/api/doses/today` lookups bridging local and UTC day boundaries.
+- Deliver clean SPA navigation across dashboard summaries, medicine management, schedule creation, today's doses, and historical adherence logs using typed frontend API clients.
+
+---
+
+## Key Features
+
+- **Medication Inventory Management:** Create, view, edit, and delete medicines with dosage, frequency, schedule time, date range (`startDate`/`endDate`), `initialStock`, `currentStock`, `lowStockThreshold` (default `5`), and optional notes.
+- **Automated Idempotent Stock Deduction:** Updating a `DoseRecord` status to `"taken"` via `PUT /api/doses/:id` automatically records `takenAt` and deducts `1` from the linked medicine's `currentStock` (only when transitioning from a non-`taken` status, never dropping below `0`).
+- **Recurring Schedules:** Link enabled/disabled `Schedule` entries to any medicine (`GET /api/schedules?medicineId=...`).
+- **Today's Dose Tracking (`GET /api/doses/today`):** Computes an inclusive date window covering both local and UTC day boundaries, filterable by optional `?date` and `?medicineId`.
+- **Adherence History Filtering (`GET /api/doses`):** Filter dose logs by `medicineId`, `scheduleId`, and `status` (`pending`, `taken`, `missed`).
+- **7-Page React SPA:** Dedicated views for Dashboard (`/dashboard`), Medicines List (`/medicines`), Add/Edit Medicine (`/medicines/new`, `/medicines/:id/edit`), Medicine Detail (`/medicines/:id`), Schedules (`/schedules`), Doses (`/doses`), and History (`/history`), with toast feedback, empty states, loading spinners, and modal dialogs.
+- **Deployment Ready:** Includes `render.yaml` for backend deployment on Render and `frontend/vercel.json` SPA rewrites for Vercel hosting.
+
+---
+
+## Technology Stack
+
+### Backend (`backend/package.json`)
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| Express | `^5.1.0` | HTTP server, routing, slash/prefix normalization, error handling |
+| Mongoose | `^8.24.4` | MongoDB schemas, validation, `.populate()` relations |
+| TypeScript | `^5.9.3` | Strict backend typing compiled to `dist/` |
+| `cors` | `^2.8.5` | Dynamic allowlist (`localhost`, `*.vercel.app`, `CLIENT_URL`) |
+| `dotenv` | `^17.2.3` | Loads `backend/.env` before server startup |
+| `tsx` | `^4.23.15` | Watch-mode TypeScript runner (`npm run dev`) |
+
+### Frontend (`frontend/package.json`)
+
+| Package | Version | Purpose |
+| --- | --- | --- |
+| React / React DOM | `^19.2.8` | Component UI library |
+| React Router DOM | `^7.18.4` | Client-side routing (`/dashboard`, `/medicines`, `/schedules`, `/doses`, `/history`) |
+| Vite | `^8.3.0` | Frontend bundler and dev server (`@vitejs/plugin-react`) |
+| Tailwind CSS | `^4.3.3` | Utility-first styling via `@tailwindcss/vite` |
+| Lucide React | `^1.52.0` | UI icon set |
+| TypeScript / `oxlint` | `~6.0.2` / `^1.81.0` | Type checking (`tsc -b`) and linting |
+
+---
+
+## Screenshots
+
+No UI screenshots are currently committed to this repository. Running the frontend (`npm run dev` in `frontend/`) renders the 7 routed pages (`DashboardPage`, `MedicinesListPage`, `MedicineFormPage`, `MedicineDetailPage`, `SchedulesPage`, `DosesPage`, and `HistoryPage`).
+
+---
+
+## Architecture Diagram
+
+```mermaid
+flowchart LR
+    User["Browser Client<br/>React 19 + React Router 7 + Tailwind 4"] -->|"VITE_API_URL<br/>Fetch API (services/api.ts)"| Express["Express 5 API (backend/src/app.ts)<br/>CORS Allowlist + URL Normalizer"]
+    Express --> Health["GET /api/health, /health, /"]
+    Express --> MedRoutes["/api/medicines"]
+    Express --> SchedRoutes["/api/schedules"]
+    Express --> DoseRoutes["/api/doses"]
+
+    MedRoutes --> MedCtrl["medicineController.ts"]
+    SchedRoutes --> SchedCtrl["scheduleController.ts"]
+    DoseRoutes --> DoseCtrl["doseController.ts<br/>(+ Idempotent Stock Deduction)"]
+
+    MedCtrl --> Mongo[("MongoDB<br/>Medicine | Schedule | DoseRecord")]
+    SchedCtrl --> Mongo
+    DoseCtrl --> Mongo
 ```
-[ Client / Browser ] (React + Vite SPA on Vercel)
-         │
-         │ HTTPS / JSON API
-         ▼
-[ Express API Server ] (Node.js + TypeScript on Render)
-         │
-         │ Mongoose ODM
-         ▼
-[ MongoDB Atlas ] (Cloud NoSQL Database)
-```
 
 ---
 
-## Folder Structure
+## Application Workflow
 
-```
+1. **Medicine Creation:** The user submits a medicine via `MedicineFormPage` (`POST /api/medicines`) with starting inventory (`initialStock`, `currentStock`) and a `lowStockThreshold`.
+2. **Schedule Setup:** Schedules are created on `SchedulesPage` (`POST /api/schedules`) referencing `medicineId`, reminder `time`, `frequency`, and `enabled` flag.
+3. **Daily Dose Management:** `DosesPage` queries `/api/doses/today` and allows creating or updating daily `DoseRecord` items.
+4. **Stock Synchronization:** Marking a dose `"taken"` triggers `updateDose` (`PUT /api/doses/:id`), which auto-populates `takenAt` (if absent) and reduces the medicine's `currentStock` by `1` without going below `0` — guarded so repeated `"taken"` updates do not double-deduct stock.
+5. **Monitoring & History:** `DashboardPage` highlights active schedules and low-stock medicines (`currentStock <= lowStockThreshold`), while `HistoryPage` displays filterable adherence records across dates and statuses.
+
+---
+
+## Project Directory Structure
+
+Tracked structure in the repository (`git ls-files`):
+
+```text
 Medicine-Reminder-Stock-Tracker/
-├── .gitignore                      # Root Git ignore (prevents committing secrets)
-├── README.md                       # Complete documentation
+├── .gitignore                        # Root ignore rules
+├── README.md                         # Project documentation
+├── render.yaml                       # Render backend deployment spec (PORT=10000, rootDir: backend)
 ├── backend/
-│   ├── .env.example                # Backend environment template
-│   ├── .gitignore                  # Backend Git ignore
-│   ├── package.json
+│   ├── .env.example                  # Sample backend env config (PORT, MONGODB_URI, CLIENT_URL)
+│   ├── .gitignore
+│   ├── package.json                  # Express 5, Mongoose 8, TypeScript, tsx
 │   ├── tsconfig.json
 │   └── src/
-│       ├── app.ts                  # Express application setup & CORS configuration
-│       ├── server.ts               # Server startup & 0.0.0.0 host binding
-│       ├── config/
-│       │   └── database.ts         # MongoDB Atlas connection
+│       ├── server.ts                 # Env loader, PORT validation, 0.0.0.0 bind, DB connect
+│       ├── app.ts                    # CORS allowlist, path normalization, route mounting, 404/error handlers
+│       ├── config/database.ts        # Mongoose connection helper
+│       ├── models/
+│       │   ├── Medicine.ts           # Inventory & threshold schema
+│       │   ├── Schedule.ts           # Reminder time & enabled state schema
+│       │   └── DoseRecord.ts         # Dose log (pending | taken | missed) schema
 │       ├── controllers/
 │       │   ├── medicineController.ts
 │       │   ├── scheduleController.ts
-│       │   └── doseController.ts   # Dose tracking & atomic stock deduction
-│       ├── models/
-│       │   ├── Medicine.ts
-│       │   ├── Schedule.ts
-│       │   └── DoseRecord.ts
+│       │   └── doseController.ts     # Filtering, local+UTC today window, stock deduction
 │       └── routes/
 │           ├── medicineRoutes.ts
 │           ├── scheduleRoutes.ts
 │           └── doseRoutes.ts
 └── frontend/
-    ├── .env.example                # Frontend environment template
-    ├── .gitignore                  # Frontend Git ignore
-    ├── package.json
-    ├── tsconfig.json
-    ├── tsconfig.app.json
-    ├── vercel.json                 # Vercel SPA rewrite configuration
+    ├── .env.example                  # VITE_API_URL=http://localhost:5000/api
+    ├── .oxlintrc.json                # oxlint ruleset
+    ├── vercel.json                   # Vercel SPA rewrite to /
+    ├── package.json                  # React 19, Vite 8, Tailwind 4, oxlint
     ├── vite.config.ts
     └── src/
-        ├── App.tsx                 # Route definitions
-        ├── main.tsx                # Entry point
-        ├── index.css               # Tailwind CSS styles
-        ├── types/                  # TypeScript interfaces & status helpers
-        ├── services/
-        │   └── api.ts              # Centralized API service
-        ├── context/
-        │   └── ToastContext.tsx    # Toast notifications
+        ├── App.tsx                   # BrowserRouter routes (/dashboard, /medicines/*, /schedules, /doses, /history)
+        ├── context/ToastContext.tsx
+        ├── services/api.ts           # Typed fetch wrapper (medicinesApi, schedulesApi, dosesApi)
+        ├── types/index.ts
         ├── components/
-        │   ├── common/             # Reusable UI (Button, Badge, Modal, etc.)
-        │   └── layout/             # Layout, Navbar, Sidebar
-        └── pages/                  # Dashboard, Medicines, Schedules, Doses, History
+        │   ├── common/               # Badge, Button, EmptyState, ErrorState, LoadingSpinner, Modal
+        │   └── layout/               # Layout, Navbar, Sidebar
+        └── pages/                    # Dashboard, MedicinesList, MedicineForm, MedicineDetail, Schedules, Doses, History
 ```
 
 ---
 
-## Local Setup
+## Database Design
+
+Three MongoDB collections modeled with Mongoose (`{ timestamps: true }`):
+
+### 1. `Medicine` (`backend/src/models/Medicine.ts`)
+
+| Field | Type | Constraints / Default | Purpose |
+| --- | --- | --- | --- |
+| `name` | `String` | `required`, `trim` | Medication display name |
+| `dosage` | `String` | `required`, `trim` | Strength/dose (e.g., `500mg`) |
+| `frequency` | `String` | `required`, `trim` | Dosing cadence |
+| `scheduleTime` | `String` | `required`, `trim` | Primary reminder time |
+| `startDate` / `endDate` | `Date` | `startDate` required, `endDate` optional | Active course dates |
+| `initialStock` / `currentStock` | `Number` | `required`, `min: 0` | Baseline and remaining pill/unit counts |
+| `lowStockThreshold` | `Number` | Default: `5`, `min: 0` | Threshold for low-stock warning UI |
+| `notes` | `String` | Default: `""`, `trim` | Optional instructions |
+
+### 2. `Schedule` (`backend/src/models/Schedule.ts`)
+
+| Field | Type | Constraints / Default | Purpose |
+| --- | --- | --- | --- |
+| `medicineId` | `ObjectId` | `ref: "Medicine"`, `required` | Parent medicine reference |
+| `time` | `String` | `required`, `trim` | Reminder time |
+| `frequency` | `String` | `required`, `trim` | Schedule frequency |
+| `startDate` / `endDate` | `Date` | `startDate` required, `endDate` optional | Schedule validity range |
+| `enabled` | `Boolean` | Default: `true` | Active toggle |
+
+### 3. `DoseRecord` (`backend/src/models/DoseRecord.ts`)
+
+| Field | Type | Constraints / Default | Purpose |
+| --- | --- | --- | --- |
+| `medicineId` | `ObjectId` | `ref: "Medicine"`, `required` | Medicine taken/scheduled |
+| `scheduleId` | `ObjectId` | `ref: "Schedule"`, optional | Linked schedule entry |
+| `scheduledDate` | `Date` | `required` | Calendar date of scheduled dose |
+| `scheduledTime` | `String` | `required`, `trim` | Scheduled dose time |
+| `status` | `String` | Enum `["pending", "taken", "missed"]`, default `"pending"` | Adherence outcome |
+| `takenAt` | `Date` | Optional (auto-managed on status change) | Timestamp when marked `"taken"` |
+| `notes` | `String` | Default: `""`, `trim` | Optional intake note |
+
+---
+
+## API Documentation
+
+Base URL (local): `http://localhost:5000/api` (middleware in `app.ts` also normalizes duplicate slashes and prefixes non-`/api` paths automatically).
+
+### Health Endpoint
+
+| Method | Endpoint | Response |
+| --- | --- | --- |
+| `GET` | `/api/health` (or `/health`, `/`) | `200 OK` `{ "success": true, "message": "Medicine Reminder API is running" }` |
+
+### Medicines (`/api/medicines`)
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/medicines` | Create a new medicine with stock counts & threshold |
+| `GET` | `/api/medicines` | List all medicines sorted newest-first (`createdAt: -1`) |
+| `GET` | `/api/medicines/:id` | Fetch single medicine by ObjectId |
+| `PUT` | `/api/medicines/:id` | Update medicine attributes and stock counts |
+| `DELETE` | `/api/medicines/:id` | Delete medicine record |
+
+### Schedules (`/api/schedules`)
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/schedules` | Create a schedule linked to `medicineId` |
+| `GET` | `/api/schedules` | List schedules (supports `?medicineId=<id>`) |
+| `GET` | `/api/schedules/:id` | Fetch single schedule by ObjectId |
+| `PUT` | `/api/schedules/:id` | Update schedule timing, frequency, dates, or `enabled` state |
+| `DELETE` | `/api/schedules/:id` | Delete schedule entry |
+
+### Dose Records (`/api/doses`)
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/doses` | Create a dose log (`pending`, `taken`, or `missed`) |
+| `GET` | `/api/doses` | List doses (filters: `?medicineId`, `?scheduleId`, `?status`) |
+| `GET` | `/api/doses/today` | Fetch today's doses across local+UTC boundary window (optional `?date`, `?medicineId`) |
+| `GET` | `/api/doses/:id` | Fetch single dose populated with `medicineId` and `scheduleId` |
+| `PUT` | `/api/doses/:id` | Update status/notes; deducts stock (`-1`, min `0`) once upon transition to `"taken"` |
+| `DELETE` | `/api/doses/:id` | Delete dose record |
+
+---
+
+## Installation Instructions
 
 ### Prerequisites
-- Node.js (v18 or higher recommended)
-- npm (v9 or higher)
-- MongoDB Atlas connection string (or local MongoDB instance)
 
-### 1. Clone the repository
+- **Node.js** `v18+` (or `v20+` LTS) and **npm**
+- **MongoDB** (local daemon or MongoDB Atlas cluster)
+
+### Clone & Install
+
 ```bash
-git clone https://github.com/your-username/Medicine-Reminder-Stock-Tracker.git
+git clone https://github.com/mohan5535/Medicine-Reminder-Stock-Tracker.git
 cd Medicine-Reminder-Stock-Tracker
-```
 
-### 2. Backend Setup
-```bash
+# Backend dependencies
 cd backend
 npm install
-```
-Create `.env` file in `backend/`:
-```env
-PORT=5000
-MONGODB_URI=your_mongodb_connection_string
-CLIENT_URL=http://localhost:5173
-```
-Build and run the backend:
-```bash
-# Build TypeScript
-npm run build
+cp .env.example .env
 
-# Start server
-npm start
-
-# Or development mode with live watch:
-npm run dev
-```
-Backend will run at `http://localhost:5000`. Test health:
-```bash
-curl http://localhost:5000/api/health
-```
-
-### 3. Frontend Setup
-```bash
+# Frontend dependencies
 cd ../frontend
 npm install
+cp .env.example .env
 ```
-Create `.env` file in `frontend/`:
-```env
-VITE_API_URL=http://localhost:5000/api
-```
-Build and run the frontend:
-```bash
-# Build TypeScript & Vite assets
-npm run build
-
-# Start Vite development server
-npm run dev
-```
-Frontend will be available at `http://localhost:5173`.
 
 ---
 
 ## Environment Variables
 
-### Backend (`backend/.env`)
-| Variable | Description | Example (Local) | Example (Production) |
-| :--- | :--- | :--- | :--- |
-| `PORT` | Server listening port | `5000` | Assigned automatically by Render |
-| `MONGODB_URI` | MongoDB Atlas URI | `mongodb+srv://user:pass@cluster.mongodb.net/dbname` | `mongodb+srv://...` |
-| `CLIENT_URL` | Allowed frontend origin(s) | `http://localhost:5173` | `https://your-frontend.vercel.app` |
+### Backend (`backend/.env` — template in `backend/.env.example`)
 
-### Frontend (`frontend/.env`)
-| Variable | Description | Example (Local) | Example (Production) |
-| :--- | :--- | :--- | :--- |
-| `VITE_API_URL` | Backend base API URL | `http://localhost:5000/api` | `https://your-backend.onrender.com/api` |
+| Variable | Default / Example | Purpose |
+| --- | --- | --- |
+| `PORT` | `5000` (Render uses `10000`) | HTTP listen port (`0–65535` integer validated at startup) |
+| `MONGODB_URI` | `mongodb+srv://...` | Required MongoDB connection string |
+| `CLIENT_URL` | `http://localhost:5173` | Comma-separated allowed frontend CORS origins |
 
----
+### Frontend (`frontend/.env` — template in `frontend/.env.example`)
 
-## API Endpoints
-
-### Health Check
-- `GET /api/health` — System health check
-
-### Medicines (`/api/medicines`)
-- `POST /api/medicines` — Create a new medicine
-- `GET /api/medicines` — List all medicines (sorted newest first)
-- `GET /api/medicines/:id` — Get medicine details by ID
-- `PUT /api/medicines/:id` — Update medicine details or stock
-- `DELETE /api/medicines/:id` — Delete a medicine
-
-### Schedules (`/api/schedules`)
-- `POST /api/schedules` — Create a schedule
-- `GET /api/schedules` — List schedules (supports `?medicineId=`)
-- `GET /api/schedules/:id` — Get schedule by ID
-- `PUT /api/schedules/:id` — Update schedule or toggle enabled
-- `DELETE /api/schedules/:id` — Delete a schedule
-
-### Doses (`/api/doses`)
-- `POST /api/doses` — Log a new dose record
-- `GET /api/doses` — List dose records (supports `?medicineId=&status=`)
-- `GET /api/doses/today` — Get doses scheduled for today (supports `?date=`)
-- `GET /api/doses/:id` — Get dose record by ID
-- `PUT /api/doses/:id` — Update dose status (`pending`, `taken`, `missed`); marking taken atomically reduces stock
-- `DELETE /api/doses/:id` — Delete a dose record
+| Variable | Default / Example | Purpose |
+| --- | --- | --- |
+| `VITE_API_URL` | `http://localhost:5000/api` | Base URL consumed by `frontend/src/services/api.ts` |
 
 ---
 
-## MongoDB Setup
+## How to Run Locally
 
-1. Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
-2. Create a Database User with read and write privileges.
-3. In **Network Access**, add `0.0.0.0/0` to allow inbound connections from Render.
-4. Obtain the connection string under **Database > Connect > Drivers**.
-5. Set `MONGODB_URI` in `backend/.env` (or in Render environment settings).
+Open two terminals from the repository root:
 
----
-
-## Production Deployment
-
-### 1. Backend Deployment on Render
-
-1. Log in to [Render Dashboard](https://dashboard.render.com).
-2. Click **New + > Web Service**.
-3. Connect your GitHub repository.
-4. Set the following settings:
-   - **Name**: `medicine-reminder-backend`
-   - **Root Directory**: `backend`
-   - **Environment**: `Node`
-   - **Build Command**: `npm install && npm run build`
-   - **Start Command**: `npm start`
-5. In **Environment Variables**, add:
-   - `MONGODB_URI`: `<your_mongodb_atlas_connection_string>`
-   - `CLIENT_URL`: `https://your-frontend.vercel.app`
-   - `NODE_ENV`: `production`
-   *(Render assigns `PORT` automatically; the server listens on `process.env.PORT` bound to `0.0.0.0`)*.
-6. Deploy the service and note your live URL (e.g., `https://medicine-reminder-backend.onrender.com`).
-
-### 2. Frontend Deployment on Vercel
-
-1. Log in to [Vercel](https://vercel.com).
-2. Click **Add New... > Project** and import your GitHub repository.
-3. Configure project settings:
-   - **Framework Preset**: `Vite`
-   - **Root Directory**: `frontend`
-   - **Build Command**: `npm run build`
-   - **Output Directory**: `dist`
-4. In **Environment Variables**, add:
-   - `VITE_API_URL`: `https://your-backend.onrender.com/api`
-5. Click **Deploy**.
-6. SPA routing is automatically handled by [`frontend/vercel.json`](file:///c:/Users/Mohan/OneDrive/Desktop/Intership/Medicine-Reminder-Stock-Tracker/frontend/vercel.json) to prevent 404 errors on page refresh.
-
----
-
-## Testing Instructions
-
-### Run Backend Tests
-Run the TypeScript compiler:
 ```bash
+# Terminal 1 — Start Backend API (port 5000)
 cd backend
-npm run build
+npm run dev
 ```
 
-### Run Frontend Tests
-Verify zero TypeScript and bundle errors:
 ```bash
+# Terminal 2 — Start Frontend SPA (Vite default port 5173)
 cd frontend
-npm run build
+npm run dev
 ```
+
+Verify API health at `http://localhost:5000/api/health` and open `http://localhost:5173` in a browser. Live frontend deployment URL configured in GitHub & CORS allowlists: `https://medicine-reminder-stock-tracker-fro.vercel.app`.
 
 ---
 
-## Security Best Practices Implemented
+## Usage Examples & Real-World Scenarios
 
-- All `.env` and sensitive environment files are excluded via `.gitignore`.
-- Zero credentials or secrets exist in the source code or documentation.
-- CORS restricted to explicit development and configured production frontend domains.
-- Input validation on all endpoints prevents injection, negative stock values, and invalid dates.
-- Atomic stock decrements ensure concurrency safety without negative inventory.
+### Scenario 1: Setting Up a Daily Prescription & Refill Alert Threshold
+
+A patient or caregiver registers a twice-daily prescription with 30 starting tablets and a low-stock threshold of 5 (`POST /api/medicines`), then attaches recurring morning/evening reminders (`POST /api/schedules`):
+
+```bash
+# 1. Create a medicine with stock tracking
+curl -X POST http://localhost:5000/api/medicines \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name":"Metformin",
+    "dosage":"500mg",
+    "frequency":"Once daily",
+    "scheduleTime":"08:00",
+    "startDate":"2026-11-12",
+    "initialStock":30,
+    "currentStock":30,
+    "lowStockThreshold":5,
+    "notes":"Take after breakfast"
+  }'
+
+# 2. Fetch today'\''s scheduled doses across local/UTC boundary
+curl http://localhost:5000/api/doses/today
+```
+
+### Scenario 2: Marking a Dose Taken With Idempotent Inventory Deduction
+
+When the patient clicks **Mark Taken** on `DosesPage` (`PUT /api/doses/:id` with `{ "status": "taken" }`), `doseController.ts` sets `takenAt` automatically and reduces `currentStock` by `1` (floored at `0`) **once** — preventing double deduction if the update is retried. Once `currentStock <= lowStockThreshold`, `DashboardPage` highlights a low-stock refill warning.
+
+---
+
+## Testing Instructions & Results
+
+- **Current Automated Coverage:**
+  - `backend/package.json` provides `dev`, `build` (`tsc`), and `start` scripts; there is **no automated backend test runner or suite** configured yet.
+  - `frontend/package.json` provides **TypeScript project build verification** (`npm run build` executes `tsc -b && vite build`) and **linting** (`npm run lint` executes `oxlint`), with no automated unit/E2E test runner configured.
+- **Verification Commands Available Locally:**
+
+```bash
+# Backend TypeScript compilation check
+cd backend && npm run build
+
+# Frontend linter and TypeScript + Vite build check
+cd frontend && npm run lint && npm run build
+```
+
+- **Note on Results:** No fabricated test pass metrics are reported here; run the build/lint commands above alongside manual CRUD verification against a local or Atlas MongoDB instance.
+
+---
+
+## Deployment Instructions
+
+### Backend (Render — `render.yaml` Included)
+
+- Root directory: `backend`
+- Build command: `npm install && npm run build`
+- Start command: `npm start` (runs `node dist/server.js`, binding `0.0.0.0:$PORT`)
+- Environment variables: `PORT=10000`, `MONGODB_URI` (secret), `CLIENT_URL=https://medicine-reminder-stock-tracker-fro.vercel.app`
+
+### Frontend (Vercel — `frontend/vercel.json` Included)
+
+- Root directory: `frontend`
+- Build command: `npm run build` (`dist/`)
+- Environment variable: `VITE_API_URL=<your-deployed-render-backend-url>/api`
+- `frontend/vercel.json` rewrites `/(.*)` -> `/` so React Router client-side paths resolve cleanly on page reload.
+
+---
+
+## Security Considerations
+
+- **CORS Allowlist:** `backend/src/app.ts` restricts browser origins to `localhost`/`127.0.0.1` ports, `*.vercel.app`, and origins explicitly listed in `CLIENT_URL` (note: matching any `*.vercel.app` subdomain is convenient for preview deployments, so tightening to exact production origins is recommended for sensitive workloads).
+- **Input Validation & ObjectId Checks:** Controllers validate `mongoose.Types.ObjectId.isValid(id)` before querying, enforce non-negative stock values (`min: 0`), and restrict dose status to `pending`, `taken`, or `missed`.
+- **Error Handling:** Malformed JSON triggers a structured `400 Invalid JSON payload` response, and unhandled errors return `500 Internal server error` without exposing stack traces to clients.
+- **Authentication Scope:** This application currently operates as a single-user / unauthenticated tracker (no login, JWT, or multi-tenant user isolation). Do not expose shared multi-user medical data publicly without adding authentication and authorization middleware.
+
+---
+
+## Future Improvements
+
+1. Add user authentication (JWT or session-based accounts) with per-user `Medicine`, `Schedule`, and `DoseRecord` ownership isolation.
+2. Add automated tests (`vitest`/`supertest` with `mongodb-memory-server` on the backend and React Testing Library on the frontend).
+3. Add transactional stock deduction / restoration when toggling a dose back from `"taken"` to `"pending"` or `"missed"`.
+4. Add browser push / Web Notification reminders or scheduled email alerts for upcoming doses and low-stock refills, plus a root `LICENSE` file matching the declared `ISC` license.
+
+---
+
+## Contribution Guidelines
+
+1. Fork the repository and create a feature branch (`git checkout -b feat/your-feature`).
+2. Run TypeScript checks in `backend/` (`npm run build`) and lint + build in `frontend/` (`npm run lint && npm run build`) before committing.
+3. Keep `.env` files out of Git commits (update `.env.example` when introducing new variables).
+4. Submit a pull request summarizing database, API, or UI changes.
+
+---
+
+## License
+
+Backend package license is declared as **`ISC`** in `backend/package.json` (`frontend/package.json` is `"private": true`). A root `LICENSE` file is not yet committed in the repository.
+
+---
+
+## Author
+
+- **Mohan** — GitHub: [@mohan5535](https://github.com/mohan5535)
+- Repository: [mohan5535/Medicine-Reminder-Stock-Tracker](https://github.com/mohan5535/Medicine-Reminder-Stock-Tracker)
